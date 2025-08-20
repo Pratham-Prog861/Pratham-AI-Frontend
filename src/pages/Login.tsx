@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -8,8 +8,15 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, isLoggedIn } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/chat');
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,33 +31,32 @@ const Login = () => {
     setError('');
 
     try {
-      // First try to login
+      // Attempt to login
       const loginResponse = await api.login(trimmedUsername);
       
-      // Then ensure user has at least one chat
-      let userChats = loginResponse.chats;
-      
-      if (userChats.length === 0) {
-        try {
-          const newChat = await api.createChat(trimmedUsername);
-          userChats = [newChat];
-        } catch (chatError) {
-          console.error('Error creating initial chat:', chatError);
-          // Continue with login even if chat creation fails
+      try {
+        // Create new chat if needed
+        if (loginResponse.chats.length === 0) {
+          await api.createChat(trimmedUsername);
         }
+        
+        // Complete login process
+        login(trimmedUsername);
+        navigate('/chat', { replace: true });
+      } catch (chatError) {
+        console.error('Chat creation error:', chatError);
+        // Still allow login even if chat creation fails
+        login(trimmedUsername);
+        navigate('/chat', { replace: true });
       }
-      
-      // Complete login process
-      login(trimmedUsername);
-      navigate('/chat');
     } catch (error) {
+      console.error('Login error:', error);
       if (axios.isAxiosError(error)) {
+        // Handle specific API errors
         const message = error.response?.data?.message || 'Failed to login. Please try again.';
         setError(message);
-        console.error('Login error:', error.response?.data);
       } else {
-        setError('An unexpected error occurred');
-        console.error('Login error:', error);
+        setError('An unexpected error occurred. Please try again.');
       }
     } finally {
       setIsLoading(false);

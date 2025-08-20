@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useState, useContext } from 'react';
 import type { ReactNode } from 'react';
 
 interface AuthContextType {
@@ -8,25 +8,32 @@ interface AuthContextType {
   isLoggedIn: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// eslint-disable-next-line react-refresh/only-export-components
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [username, setUsername] = useState<string | null>(() => {
-    return localStorage.getItem('username');
-  });
+  const [username, setUsername] = useState<string | null>(localStorage.getItem('username'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('username'));
 
   const login = (username: string) => {
-    setUsername(username);
     localStorage.setItem('username', username);
+    setUsername(username);
+    setIsLoggedIn(true);
   };
 
   const logout = () => {
-    setUsername(null);
     localStorage.removeItem('username');
+    setUsername(null);
+    setIsLoggedIn(false);
   };
 
   return (
-    <AuthContext.Provider value={{ username, login, logout, isLoggedIn: !!username }}>
+    <AuthContext.Provider value={{ 
+      username, 
+      login, 
+      logout, 
+      isLoggedIn 
+    }}>
       {children}
     </AuthContext.Provider>
   );

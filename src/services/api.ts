@@ -2,6 +2,15 @@ import axios, { AxiosError } from 'axios';
 
 const API_URL = 'https://pratham-ai-backend.onrender.com/api';
 
+// Add request timeout and base URL configuration
+const axiosInstance = axios.create({
+  baseURL: API_URL,
+  timeout: 10000, // 10 seconds timeout
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
 export interface Message {
   id: string;
   content: string;
@@ -30,15 +39,17 @@ interface MessageResponse {
 const api = {
   login: async (username: string): Promise<LoginResponse> => {
     try {
-      const response = await axios.post(`${API_URL}/login`, { 
-        username: username.trim()
+      const response = await axiosInstance.post('/login', { 
+        username: username.trim() 
       });
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError;
-        if (axiosError.response?.status === 500) {
-          throw new Error('Server error. Please try again later.');
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Connection timeout. Please try again.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Service not found. Please try again later.');
         }
       }
       throw error;
