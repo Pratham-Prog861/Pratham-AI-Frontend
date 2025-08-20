@@ -12,6 +12,8 @@ interface SidebarProps {
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
   onDeleteAllChats: () => void;
+  onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
 }
 
 const Sidebar = ({
@@ -20,7 +22,9 @@ const Sidebar = ({
   onChatSelect,
   onNewChat,
   onDeleteChat,
-  onDeleteAllChats
+  onDeleteAllChats,
+  onToggleSidebar,
+  isSidebarOpen
 }: SidebarProps) => {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
@@ -37,33 +41,69 @@ const Sidebar = ({
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-800 text-white w-64 p-4">
-      <div className="flex items-center justify-center mb-8">
-        <h1 className="text-xl font-bold">Pratham AI</h1>
+    <div className="flex flex-col h-screen bg-gray-800 text-white w-[260px]">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <h1 className="text-lg sm:text-xl font-bold">Pratham AI</h1>
+        {/* Updated mobile menu button */}
+        <button 
+          onClick={onToggleSidebar}
+          className="sm:hidden text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-700"
+          aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          <svg 
+            className="w-6 h-6" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            {isSidebarOpen ? (
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M6 18L18 6M6 6l12 12"
+              />
+            ) : (
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            )}
+          </svg>
+        </button>
       </div>
 
-      <button
-        onClick={onNewChat}
-        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md mb-4 transition-colors"
-      >
-        <FiPlus /> New Chat
-      </button>
+      {/* New Chat Button */}
+      <div className="p-3">
+        <button
+          onClick={onNewChat}
+          className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 
+            text-white py-2.5 px-4 rounded-lg transition-colors text-sm sm:text-base"
+        >
+          <FiPlus className="w-4 h-4 sm:w-5 sm:h-5" /> New Chat
+        </button>
+      </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* Chat List */}
+      <div className="flex-1 overflow-y-auto px-3">
         {chats.length === 0 ? (
-          <div className="text-gray-400 text-center mt-4">
+          <div className="text-gray-400 text-center mt-4 text-sm sm:text-base">
             No chat history yet
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-1">
             {chats.map((chat) => (
               <li key={chat.id}>
                 <div
-                  className={`flex justify-between items-center p-2 rounded-md cursor-pointer hover:bg-gray-700 ${currentChatId === chat.id ? 'bg-gray-700' : ''}`}
+                  className={`flex justify-between items-center p-2.5 rounded-lg cursor-pointer 
+                    hover:bg-gray-700 ${currentChatId === chat.id ? 'bg-gray-700' : ''}`}
                   onClick={() => onChatSelect(chat.id)}
                 >
-                  <div className="truncate flex-1">
-                    <div className="font-medium truncate">{chat.title}</div>
+                  <div className="truncate flex-1 min-w-0">
+                    <div className="font-medium truncate text-sm sm:text-base">{chat.title}</div>
                     <div className="text-xs text-gray-400">{formatDate(chat.createdAt)}</div>
                   </div>
                   <button
@@ -71,10 +111,10 @@ const Sidebar = ({
                       e.stopPropagation();
                       onDeleteChat(chat.id);
                     }}
-                    className="text-gray-400 hover:text-red-500 p-1"
+                    className="text-gray-400 hover:text-red-500 p-1.5 ml-2"
                     title="Delete chat"
                   >
-                    <FiTrash2 size={16} />
+                    <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </li>
@@ -83,54 +123,56 @@ const Sidebar = ({
         )}
       </div>
 
-      <div className="mt-auto pt-4 border-t border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      {/* User Profile and Actions */}
+      <div className="mt-auto border-t border-gray-700 p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 min-w-0">
             <UserAvatar 
               username={username || 'User'} 
-              size={36}
+              size={32}
               className="flex-shrink-0"
             />
-            <div className="text-sm font-medium">
+            <div className="truncate text-sm sm:text-base">
               {username || 'User'}
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="text-gray-400 hover:text-red-500 p-1"
+            className="text-gray-400 hover:text-red-500 p-1.5"
             title="Logout"
           >
-            <FiLogOut size={18} />
+            <FiLogOut className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {confirmDelete ? (
-          <div className="text-center">
-            <p className="text-sm mb-2">Delete all chats?</p>
+          <div className="text-center space-y-2">
+            <p className="text-sm">Delete all chats?</p>
             <div className="flex gap-2">
               <button
                 onClick={() => {
                   onDeleteAllChats();
                   setConfirmDelete(false);
                 }}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-md text-sm"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-md text-sm"
               >
-                Yes
+                Yes, delete all
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-1 px-2 rounded-md text-sm"
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-md text-sm"
               >
-                No
+                Cancel
               </button>
             </div>
           </div>
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 
+              text-white py-2 px-4 rounded-lg transition-colors text-sm sm:text-base"
           >
-            <FiTrash2 /> Delete All Chats
+            <FiTrash2 className="w-4 h-4 sm:w-5 sm:h-5" /> Delete All Chats
           </button>
         )}
       </div>

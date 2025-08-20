@@ -4,7 +4,7 @@ import Sidebar from '../components/Sidebar';
 import ChatArea from '../components/ChatArea';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import type { Chat } from '../services/api';
+import type { Chat, Message } from '../services/api';
 import { AxiosError } from 'axios';
 
 
@@ -14,7 +14,8 @@ const ChatPage = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -30,8 +31,13 @@ const ChatPage = () => {
         const fetchedChats = await api.getChats(username);
         setChats(fetchedChats);
         
-        // Select the most recent chat if available
-        if (fetchedChats.length > 0 && !currentChatId) {
+        // If no chats exist, create one automatically
+        if (fetchedChats.length === 0) {
+          const newChat = await api.createChat(username);
+          setChats([newChat]);
+          setCurrentChatId(newChat.id);
+        } else {
+          // Always select the most recent chat on initial load
           setCurrentChatId(fetchedChats[0].id);
         }
       } catch (err) {
@@ -43,7 +49,7 @@ const ChatPage = () => {
     };
 
     fetchChats();
-  }, [username, isLoggedIn, navigate, currentChatId]);
+  }, [username, isLoggedIn, navigate]); // Remove currentChatId dependency
 
   const getCurrentChat = () => {
     return chats.find(chat => chat.id === currentChatId) || null;
@@ -67,28 +73,78 @@ const ChatPage = () => {
   };
 
   const handleSendMessage = async (message: string) => {
-    if (!username || !currentChatId) return;
+    if (!username || !currentChatId) {
+      setError('Please login again or create a new chat.');
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
     
     try {
-      const { userMessage, aiResponse } = await api.sendMessage(username, currentChatId, message);
-      
-      // Update the chats state with the new messages
+      // Add optimistic update for user message
+      const tempUserMessage: Message = {
+        id: `temp-${Date.now()}`,
+        content: trimmedMessage,
+        sender: 'user',
+        timestamp: new Date().toISOString()
+      };
+
       setChats(prevChats => {
         return prevChats.map(chat => {
           if (chat.id === currentChatId) {
             return {
               ...chat,
-              messages: [...chat.messages, userMessage, aiResponse],
-              // Update title if it's the first message
-              title: chat.messages.length === 0 ? message.substring(0, 30) + (message.length > 30 ? '...' : '') : chat.title
+              messages: [...chat.messages, tempUserMessage]
             };
           }
           return chat;
         });
       });
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError('Failed to send message');
+
+      // Make API call
+      const { userMessage, aiResponse, chatTitle } = await api.sendMessage(
+        username,
+        currentChatId,
+        trimmedMessage
+      );
+      
+      // Update chats with new messages and title
+      setChats(prevChats => {
+        return prevChats.map(chat => {
+          if (chat.id === currentChatId) {
+            const messages = chat.messages.filter(msg => !msg.id.startsWith('temp-'));
+            return {
+              ...chat,
+              title: chatTitle || chat.title, // Update title if provided
+              messages: [...messages, userMessage, aiResponse]
+            };
+          }
+          return chat;
+        });
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Remove temp message on error
+      setChats(prevChats => {
+        return prevChats.map(chat => {
+          if (chat.id === currentChatId) {
+            return {
+              ...chat,
+              messages: chat.messages.filter(msg => !msg.id.startsWith('temp-'))
+            };
+          }
+          return chat;
+        });
+      });
+
+      // Show error message
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to send message. Please try again.');
+      }
     }
   };
 
@@ -171,51 +227,46 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="flex h-screen">
-      <Sidebar
-        chats={chats}
-        currentChatId={currentChatId}
-        onChatSelect={handleChatSelect}
-        onNewChat={handleNewChat}
-        onDeleteChat={handleDeleteChat}
-        onDeleteAllChats={handleDeleteAllChats}
-      />
-      
+    <div className="flex h-screen bg-[#1E1E1E]">
+      {/* Sidebar */}
+      <div 
+        className={`
+          fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          sm:relative sm:translate-x-0
+        `}
+      >
+        <Sidebar
+          chats={chats}
+          currentChatId={currentChatId}
+          onChatSelect={handleChatSelect}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+          onDeleteAllChats={handleDeleteAllChats}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isSidebarOpen={isSidebarOpen}
+        />
+      </div>
+
+      {/* Overlay - only on mobile when sidebar is open */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 sm:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main content */}
       <div className="flex-1">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <span className="block sm:inline">{error}</span>
-            <span className="absolute top-0 bottom-0 right-0 px-4 py-3" onClick={() => setError('')}>
-              <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <title>Close</title>
-                <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
-              </svg>
-            </span>
-          </div>
-        )}
-        
-        {currentChatId && currentChat ? (
-          <ChatArea
-            chatId={currentChatId}
-            messages={currentChat.messages}
-            chatTitle={currentChat.title}
-            onSendMessage={handleSendMessage}
-            onApplyAction={handleApplyAction}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full bg-gray-50">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold mb-4">Welcome to Pratham AI</h2>
-              <p className="text-gray-600 mb-6">Start a new chat or select an existing one</p>
-              <button
-                onClick={handleNewChat}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-6 rounded-md transition-colors"
-              >
-                Start New Chat
-              </button>
-            </div>
-          </div>
-        )}
+        <ChatArea
+          chatId={currentChatId}
+          messages={currentChat?.messages || []}  // Add null check with default empty array
+          chatTitle={currentChat?.title || 'New Chat'}  // Add null check with default title
+          onSendMessage={handleSendMessage}
+          onApplyAction={handleApplyAction}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isSidebarOpen={isSidebarOpen}
+        />
       </div>
     </div>
   );
