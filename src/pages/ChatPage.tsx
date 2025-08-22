@@ -266,6 +266,20 @@ const ChatPage = () => {
           onApplyAction={handleApplyAction}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
+          onAddMessage={(message) => {
+            // Add the message directly to the current chat
+            setChats(prevChats => {
+              return prevChats.map(chat => {
+                if (chat.id === currentChatId) {
+                  return {
+                    ...chat,
+                    messages: [...chat.messages, message]
+                  };
+                }
+                return chat;
+              });
+            });
+          }}
         />
       </div>
     </div>
